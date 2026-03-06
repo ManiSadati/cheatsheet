@@ -20,15 +20,18 @@ extern "C"{
     FaultType FItype;
 
     // Pick one target instruction index for this run.
-    void setRandomInjection(size_t nallocs, size_t nsubs, FaultType ft){
+    void setRandomInjection(size_t nallocs, size_t nsubs, size_t ft_){
+        FaultType ft = (FaultType)ft_;
         FIindex = 0;
         FItype = ft;
+        srand(time(NULL));
         if(FItype == LOGIC_FAULT){
             FIindex = rand() % nsubs;    
         }
         else{
             FIindex = rand() % nallocs;
         }
+        printf("FIindex is %d\n",FIindex);
     }
 
     // malloc wrapper with optional fault injection.
@@ -50,7 +53,7 @@ extern "C"{
     }
 
     // calloc wrapper with optional fault injection.
-    void *calloc(size_t nmemb, size_t size, size_t FIcounter){
+    void *callocFI(size_t nmemb, size_t size, size_t FIcounter){
         if(FIcounter == FIindex){
             if(FItype == BUF_OVERFLOW){
                 // Undersize allocation.

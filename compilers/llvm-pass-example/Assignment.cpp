@@ -78,15 +78,108 @@ Instruction* getNextInstruction(Instruction *I){
 
 namespace {
 
-struct Assignment5 : public ModulePass {
+struct Assignment : public ModulePass {
 
     static char ID;
-    Assignment5() : ModulePass(ID) {}
-    
+    Assignment() : ModulePass(ID) {}
+
+    bool runOnModule(Module &M) override {
+
+        LLVMContext &C = M.getContext();
+
+        // void setRandomInjection(size_t nallocs, size_t nsubs, FaultType ft)
+        FunctionCallee setRandomInjectionFn = M.getOrInsertFunction("setRandomInjection", Type::getVoidTy(C), Type::getInt64Ty(C), Type::getInt64Ty(C), Type::getInt64Ty(C));
+        FunctionCallee mallocFIFn = M.getOrInsertFunction("mallocFI", Type::getInt8PtrTy(C), Type::getInt64Ty(C), Type::getInt64Ty(C));
+        FunctionCallee callocFIFn = M.getOrInsertFunction("callocFI", Type::getInt8PtrTy(C), Type::getInt64Ty(C), Type::getInt64Ty(C), Type::getInt64Ty(C));
+
+        int alloc_counter = 0;
+        int sub_counter = 0;
+        for (Function &F: M){
+            for (BasicBlock &BB: F){
+                for (BasicBlock::const_iterator It = BB.begin(); It != BB.end();) {
+                    Instruction *I = const_cast<llvm::Instruction *>(&*It);
+                    I->print(errs());
+                    errs()<<"\n";
+                    It++;
+                    if (CallInst *CI = dyn_cast<CallInst> (I)){
+                        if(CI->getCalledFunction()){
+                            // change malloc and calloc with their FI version.
+                            // this will add a new arguemtn to the last 
+                            if(CI->getCalledFunction()->getName() == "malloc"){
+                                IRBuilder<> IRB(CI);
+                                Value *FIcounter =  ConstantInt::get(IRB.getInt64Ty(), alloc_counter++);
+
+                                CallInst *mallocFICallI = IRB.CreateCall(mallocFIFn, {CI->getArgOperand(0), FIcounter});
+                                
+                                CI->replaceAllUsesWith(mallocFICallI);
+                                CI->eraseFromParent();
+                            }
+                            if(CI->getCalledFunction()->getName() == "calloc"){
+                                IRBuilder<> IRB(CI);
+                                Value *FIcounter =  ConstantInt::get(IRB.getInt64Ty(), alloc_counter++);
+
+                                CallInst *callocFICallI = IRB.CreateCall(callocFIFn, {CI->getArgOperand(0), CI->getArgOperand(1), FIcounter});
+                                
+                                CI->replaceAllUsesWith(callocFICallI);
+                                CI->eraseFromParent();
+                            }
+                        }
+                    }
+                    // if(BinaryOperator *Sub = dyn_cast<BinaryOperator>(I)){
+                    //     if(Sub->getOpcode() == Instruction::Sub){
+                    //         IRBuilder<> IRB(Sub);
+                    //         BinaryOperator *Add = cast<BinaryOperator>(IRB.CreateBinOp(Instruction::Add, Sub->getOperand(0), Sub->getOperand(1)));
+                    //         Add->setHasNoSignedWrap(Sub->hasNoSignedWrap());
+                    //         Add->setHasNoUnsignedWrap(Sub->hasNoUnsignedWrap());
+
+                    //     }
+                    // }
+                    // if(I->getOpcode() == llvm::Instruction::Sub){
+
+
+                    // }
+                }
+            }
+        }
+
+
+
+        Function *Main = M.getFunction("main");
+        if (!Main || Main->isDeclaration())
+            return true;
+
+        for (BasicBlock &BB : *Main) {
+            for (BasicBlock::const_iterator It = BB.begin(); It != BB.end();) {
+                Instruction *I = const_cast<llvm::Instruction *>(&*It);
+                I->print(errs());
+                errs()<<" - \n";
+                It++;
+                if (I->isTerminator() || isa<PHINode>(I))
+                    continue;
+
+
+                Instruction *InsertBefore = I->getNextNode();
+                if (!InsertBefore)
+                    continue;
+
+                IRBuilder<> IRB(InsertBefore);
+                // void setRandomInjection(size_t nallocs, size_t nsubs, FaultType ft){
+
+                Value *nallocs =  ConstantInt::get(IRB.getInt64Ty(), alloc_counter);
+                Value *nsubs =  ConstantInt::get(IRB.getInt64Ty(), sub_counter);
+                Value *ft =  ConstantInt::get(IRB.getInt64Ty(), 0);
+                IRB.CreateCall(setRandomInjectionFn,{nallocs,nsubs,ft});
+                return true;
+            }
+        }
+        
+        return true;
+    }
 };
 
 }
 
 
-static RegisterPass<Assignment5> X("faultinjection",
+char Assignment::ID = 0;
+static RegisterPass<Assignment> X("faultinjection",
                                    "Pass to inject faults");
