@@ -19,6 +19,13 @@
 #include "llvm/Analysis/PostDominators.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/IntrinsicInst.h"
+#include "llvm/Support/CommandLine.h"
+
+// Global pass option
+static llvm::cl::opt<int> FItype(
+    "fi-type",
+    llvm::cl::desc("type/type for fault injection"),
+    llvm::cl::init(0));
 
 using namespace llvm;
 using namespace std;
@@ -167,7 +174,7 @@ struct Assignment : public ModulePass {
 
                 Value *nallocs =  ConstantInt::get(IRB.getInt64Ty(), alloc_counter);
                 Value *nsubs =  ConstantInt::get(IRB.getInt64Ty(), sub_counter);
-                Value *ft =  ConstantInt::get(IRB.getInt64Ty(), 1);
+                Value *ft =  ConstantInt::get(IRB.getInt64Ty(), FItype);
                 IRB.CreateCall(setRandomInjectionFn,{nallocs,nsubs,ft});
                 return true;
             }
