@@ -167,7 +167,7 @@ struct Assignment : public ModulePass {
 
                 Value *nallocs =  ConstantInt::get(IRB.getInt64Ty(), alloc_counter);
                 Value *nsubs =  ConstantInt::get(IRB.getInt64Ty(), sub_counter);
-                Value *ft =  ConstantInt::get(IRB.getInt64Ty(), 0);
+                Value *ft =  ConstantInt::get(IRB.getInt64Ty(), 1);
                 IRB.CreateCall(setRandomInjectionFn,{nallocs,nsubs,ft});
                 return true;
             }

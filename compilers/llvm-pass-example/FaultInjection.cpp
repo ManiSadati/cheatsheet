@@ -40,10 +40,13 @@ extern "C"{
             if(FItype == BUF_OVERFLOW){
                 // Undersize allocation.
                 size = size * 0.7;
+                printf("size is %zu\n",size);
                 void* p = malloc(size);
                 return p;
             }
             if(FItype == MEM_EXHAUST){
+
+                printf("here lol\n");
                 // Simulate allocation failure.
                 return nullptr;
             }   
@@ -63,6 +66,7 @@ extern "C"{
             }
             if(FItype == MEM_EXHAUST){
                 // Simulate allocation failure.
+                printf("here clol\n");
                 return nullptr;
             }   
         }
