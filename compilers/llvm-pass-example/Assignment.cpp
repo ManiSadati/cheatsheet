@@ -107,8 +107,6 @@ struct Assignment : public ModulePass {
             for (BasicBlock &BB: F){
                 for (BasicBlock::const_iterator It = BB.begin(); It != BB.end();) {
                     Instruction *I = const_cast<llvm::Instruction *>(&*It);
-                    I->print(errs());
-                    errs()<<"\n";
                     It++;
                     if (CallInst *CI = dyn_cast<CallInst>(I)){
                         if(CI->getCalledFunction()){
@@ -153,9 +151,9 @@ struct Assignment : public ModulePass {
                             BinaryOperator *submulV = cast<BinaryOperator>(IRB2.CreateMul(Sub,negInject));
                             BinaryOperator * addmulV = cast<BinaryOperator>(IRB2.CreateMul(Add,shouldInjectSubCallI));
                             BinaryOperator * gatherV = cast<BinaryOperator>(IRB2.CreateAdd(submulV,addmulV));
-                            Sub->replaceAllUsesWith(gatherV);
-                            submulV->setOperand(0,Sub);
-                            
+                            Sub->replaceUsesWithIf(gatherV, [&](Use &U) {
+                                return U.getUser() != submulV;  // replace everywhere except submulV
+                                });
                         }
                     }
                 }
@@ -171,8 +169,6 @@ struct Assignment : public ModulePass {
         for (BasicBlock &BB : *Main) {
             for (BasicBlock::const_iterator It = BB.begin(); It != BB.end();) {
                 Instruction *I = const_cast<llvm::Instruction *>(&*It);
-                I->print(errs());
-                errs()<<" - \n";
                 It++;
                 if (I->isTerminator() || isa<PHINode>(I))
                     continue;
