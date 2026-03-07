@@ -21,17 +21,17 @@ extern "C"{
 
     // Pick one target instruction index for this run.
     void setRandomInjection(size_t nallocs, size_t nsubs, size_t ft_){
-        FaultType ft = (FaultType)ft_;
+        printf("we are here ! %zu %zu \n",nallocs, nsubs);
         FIindex = 0;
-        FItype = ft;
+        FItype = (FaultType)ft_;
         srand(time(NULL));
         if(FItype == LOGIC_FAULT){
-            FIindex = rand() % nsubs;    
+            FIindex = nsubs ? rand() % nsubs : 0;    
         }
         else{
-            FIindex = rand() % nallocs;
+            FIindex = nallocs? rand() % nallocs : 0;
         }
-        printf("FIindex is %d\n",FIindex);
+        printf("setRandomInjection FIindex is %d\n",FIindex);
     }
 
     // malloc wrapper with optional fault injection.
@@ -76,10 +76,12 @@ extern "C"{
 
     // Pre-check function for sub to see whethere it should be injected or not,
     // True only at the selected sub instruction for FI.
-    bool shouldInjectSub(int FIcounter){
-        if(FItype != LOGIC_FAULT)
-            return false;
-        return (FIcounter -1) == FIindex;
+    int shouldInjectSub(size_t FIcounter){
+        // printf("sub FIindex is %d\n",FIindex);
+        if(FItype != LOGIC_FAULT){
+            return 0;
+        }
+        return FIindex == FIcounter;
     }
 
 

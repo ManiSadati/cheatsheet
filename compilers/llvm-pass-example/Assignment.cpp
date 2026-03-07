@@ -98,7 +98,9 @@ struct Assignment : public ModulePass {
         FunctionCallee setRandomInjectionFn = M.getOrInsertFunction("setRandomInjection", Type::getVoidTy(C), Type::getInt64Ty(C), Type::getInt64Ty(C), Type::getInt64Ty(C));
         FunctionCallee mallocFIFn = M.getOrInsertFunction("mallocFI", Type::getInt8PtrTy(C), Type::getInt64Ty(C), Type::getInt64Ty(C));
         FunctionCallee callocFIFn = M.getOrInsertFunction("callocFI", Type::getInt8PtrTy(C), Type::getInt64Ty(C), Type::getInt64Ty(C), Type::getInt64Ty(C));
+        FunctionCallee shouldInjectSubFn = M.getOrInsertFunction("shouldInjectSub", Type::getInt32Ty(C), Type::getInt64Ty(C));
 
+        
         int alloc_counter = 0;
         int sub_counter = 0;
         for (Function &F: M){
@@ -108,7 +110,7 @@ struct Assignment : public ModulePass {
                     I->print(errs());
                     errs()<<"\n";
                     It++;
-                    if (CallInst *CI = dyn_cast<CallInst> (I)){
+                    if (CallInst *CI = dyn_cast<CallInst>(I)){
                         if(CI->getCalledFunction()){
                             // change malloc and calloc with their FI version.
                             // this will add a new arguemtn to the last 
@@ -132,19 +134,30 @@ struct Assignment : public ModulePass {
                             }
                         }
                     }
-                    // if(BinaryOperator *Sub = dyn_cast<BinaryOperator>(I)){
-                    //     if(Sub->getOpcode() == Instruction::Sub){
-                    //         IRBuilder<> IRB(Sub);
-                    //         BinaryOperator *Add = cast<BinaryOperator>(IRB.CreateBinOp(Instruction::Add, Sub->getOperand(0), Sub->getOperand(1)));
-                    //         Add->setHasNoSignedWrap(Sub->hasNoSignedWrap());
-                    //         Add->setHasNoUnsignedWrap(Sub->hasNoUnsignedWrap());
+                    if(BinaryOperator *Sub = dyn_cast<BinaryOperator>(I)){
+                        if(Sub->getOpcode() == Instruction::Sub){
+                            IRBuilder<> IRB(Sub);
+                            Value *FIcounter =  ConstantInt::get(IRB.getInt64Ty(), sub_counter++);
+                            CallInst *shouldInjectSubCallI = IRB.CreateCall(shouldInjectSubFn, {FIcounter});
+                            
+                            Instruction *afterSub = getNextInstruction(Sub);
+                            IRBuilder<> IRB2(afterSub);
 
-                    //     }
-                    // }
-                    // if(I->getOpcode() == llvm::Instruction::Sub){
-
-
-                    // }
+                            BinaryOperator *Add = cast<BinaryOperator>(IRB2.CreateBinOp(Instruction::Add, Sub->getOperand(0), Sub->getOperand(1)));
+                            Add->setHasNoSignedWrap(Sub->hasNoSignedWrap());
+                            Add->setHasNoUnsignedWrap(Sub->hasNoUnsignedWrap());
+                            
+                            
+                            BinaryOperator * negInject = cast<BinaryOperator>(IRB2.CreateSub( 
+                                                                ConstantInt::get(IRB.getInt32Ty(), 1),shouldInjectSubCallI));
+                            BinaryOperator *submulV = cast<BinaryOperator>(IRB2.CreateMul(Sub,negInject));
+                            BinaryOperator * addmulV = cast<BinaryOperator>(IRB2.CreateMul(Add,shouldInjectSubCallI));
+                            BinaryOperator * gatherV = cast<BinaryOperator>(IRB2.CreateAdd(submulV,addmulV));
+                            Sub->replaceAllUsesWith(gatherV);
+                            submulV->setOperand(0,Sub);
+                            
+                        }
+                    }
                 }
             }
         }
