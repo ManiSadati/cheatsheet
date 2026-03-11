@@ -19,6 +19,7 @@
 #include "llvm/Analysis/PostDominators.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/IntrinsicInst.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Support/CommandLine.h"
 
 // Global pass option
@@ -139,21 +140,30 @@ struct Assignment : public ModulePass {
                             CallInst *shouldInjectSubCallI = IRB.CreateCall(shouldInjectSubFn, {FIcounter});
                             
                             Instruction *afterSub = getNextInstruction(Sub);
-                            IRBuilder<> IRB2(afterSub);
+                            if (!afterSub)
+                                continue;
 
-                            BinaryOperator *Add = cast<BinaryOperator>(IRB2.CreateBinOp(Instruction::Add, Sub->getOperand(0), Sub->getOperand(1)));
-                            Add->setHasNoSignedWrap(Sub->hasNoSignedWrap());
-                            Add->setHasNoUnsignedWrap(Sub->hasNoUnsignedWrap());
-                            
-                            
-                            BinaryOperator * negInject = cast<BinaryOperator>(IRB2.CreateSub( 
-                                                                ConstantInt::get(IRB.getInt32Ty(), 1),shouldInjectSubCallI));
-                            BinaryOperator *submulV = cast<BinaryOperator>(IRB2.CreateMul(Sub,negInject));
-                            BinaryOperator * addmulV = cast<BinaryOperator>(IRB2.CreateMul(Add,shouldInjectSubCallI));
-                            BinaryOperator * gatherV = cast<BinaryOperator>(IRB2.CreateAdd(submulV,addmulV));
-                            Sub->replaceUsesWithIf(gatherV, [&](Use &U) {
-                                return U.getUser() != submulV;  // replace everywhere except submulV
-                                });
+                            Value *ShouldInject =
+                                IRB.CreateICmpNE(shouldInjectSubCallI,
+                                                 ConstantInt::get(shouldInjectSubCallI->getType(), 0));
+
+                            Instruction *ThenTerm = nullptr;
+                            Instruction *ElseTerm = nullptr;
+                            SplitBlockAndInsertIfThenElse(ShouldInject, afterSub, &ThenTerm, &ElseTerm);
+
+                            IRBuilder<> ThenBuilder(ThenTerm);
+                            BinaryOperator *Add = cast<BinaryOperator>(
+                                ThenBuilder.CreateBinOp(Instruction::Add, Sub->getOperand(0), Sub->getOperand(1)));
+
+                            BasicBlock *MergeBB = afterSub->getParent();
+                            IRBuilder<> MergeBuilder(&*MergeBB->getFirstInsertionPt());
+                            PHINode *MergedResult = MergeBuilder.CreatePHI(Sub->getType(), 2);
+                            MergedResult->addIncoming(Add, ThenTerm->getParent());
+                            MergedResult->addIncoming(Sub, ElseTerm->getParent());
+
+                            Sub->replaceUsesWithIf(MergedResult, [&](Use &U) {
+                                return U.getUser() != MergedResult;
+                            });
                         }
                     }
                 }
