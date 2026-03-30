@@ -1,6 +1,9 @@
 # Prerequisites
 *.d
 
+#API Keys
+*.env
+
 # Compiled Object files
 *.slo
 *.lo
