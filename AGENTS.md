@@ -1,6 +1,7 @@
 # Repository Rules
 
 This repository stores engineering learning notes and experiments.
+Never ever read or change or delete the .env file.
 
 ## Notes
 - Use Markdown.
