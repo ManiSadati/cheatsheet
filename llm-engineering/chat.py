@@ -213,6 +213,16 @@ def display_summary(url, selected_model):
     summary = summarize(url, selected_model)
     display(Markdown(summary))
 
+def print_stream(response):
+    chat_bot_answer = "chatbot: "
+    for chunk in response:
+        chunk_answer = chunk.choices[0].delta.content or ''
+        print( chunk_answer, end="", flush=True)
+        chat_bot_answer +=  chunk_answer
+    print("")
+    return chat_bot_answer
+
+
 def main():
     load_dotenv(override=True)
     parser = build_parser()
@@ -252,14 +262,8 @@ def main():
         
         chat_history += "user: " + user_prompt
         
-        chat_bot_answer = ""
-        for chunk in response:
-            chunk_answer = chunk.choices[0].delta.content or ''
-            print( chunk_answer, end="", flush=True)
-            chat_bot_answer +=  chunk_answer
-        chat_history += "chatbot: " + chat_bot_answer
-        print("")
-
+        chat_bot_answer = print_stream(response)
+        chat_history += chat_bot_answer
 
 
 if __name__ == "__main__":
